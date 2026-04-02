@@ -5,8 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
-import win32api
-import win32con
+import ctypes
+from ctypes import wintypes
+
 from screeninfo import get_monitors
 
 
@@ -35,40 +36,121 @@ class MonitorManager:
         self._roles: Dict[str, MonitorInfo] = {}
 
     def refresh(self) -> None:
-        self._monitors = self._get_win32_monitors()
+        self._monitors = self._get_ctypes_monitors()
         if not self._monitors:
             self._monitors = self._get_screeninfo_monitors()
         self._assign_roles()
 
-    def _get_win32_monitors(self) -> List[MonitorInfo]:
+    def _get_ctypes_monitors(self) -> List[MonitorInfo]:
         monitors: List[MonitorInfo] = []
-        index = 0
+        user32 = ctypes.WinDLL("user32", use_last_error=True)
+
+        DISPLAY_DEVICE_ATTACHED_TO_DESKTOP = 0x1
+        DISPLAY_DEVICE_PRIMARY_DEVICE = 0x4
+        DISPLAY_DEVICE_MIRRORING_DRIVER = 0x8
+        DISPLAY_DEVICE_ACTIVE = 0x1
+        ENUM_CURRENT_SETTINGS = 0xFFFFFFFF
+
+        class DISPLAY_DEVICEW(ctypes.Structure):
+            _fields_ = [
+                ("cb", wintypes.DWORD),
+                ("DeviceName", wintypes.WCHAR * 32),
+                ("DeviceString", wintypes.WCHAR * 128),
+                ("StateFlags", wintypes.DWORD),
+                ("DeviceID", wintypes.WCHAR * 128),
+                ("DeviceKey", wintypes.WCHAR * 128),
+            ]
+
+        class POINTL(ctypes.Structure):
+            _fields_ = [("x", wintypes.LONG), ("y", wintypes.LONG)]
+
+        class DEVMODEW(ctypes.Structure):
+            _fields_ = [
+                ("dmDeviceName", wintypes.WCHAR * 32),
+                ("dmSpecVersion", wintypes.WORD),
+                ("dmDriverVersion", wintypes.WORD),
+                ("dmSize", wintypes.WORD),
+                ("dmDriverExtra", wintypes.WORD),
+                ("dmFields", wintypes.DWORD),
+                ("dmPosition", POINTL),
+                ("dmDisplayOrientation", wintypes.DWORD),
+                ("dmDisplayFixedOutput", wintypes.DWORD),
+                ("dmColor", wintypes.SHORT),
+                ("dmDuplex", wintypes.SHORT),
+                ("dmYResolution", wintypes.SHORT),
+                ("dmTTOption", wintypes.SHORT),
+                ("dmCollate", wintypes.SHORT),
+                ("dmFormName", wintypes.WCHAR * 32),
+                ("dmLogPixels", wintypes.WORD),
+                ("dmBitsPerPel", wintypes.DWORD),
+                ("dmPelsWidth", wintypes.DWORD),
+                ("dmPelsHeight", wintypes.DWORD),
+                ("dmDisplayFlags", wintypes.DWORD),
+                ("dmDisplayFrequency", wintypes.DWORD),
+                ("dmICMMethod", wintypes.DWORD),
+                ("dmICMIntent", wintypes.DWORD),
+                ("dmMediaType", wintypes.DWORD),
+                ("dmDitherType", wintypes.DWORD),
+                ("dmReserved1", wintypes.DWORD),
+                ("dmReserved2", wintypes.DWORD),
+                ("dmPanningWidth", wintypes.DWORD),
+                ("dmPanningHeight", wintypes.DWORD),
+            ]
+
+        enum_display_devices = user32.EnumDisplayDevicesW
+        enum_display_devices.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, ctypes.POINTER(DISPLAY_DEVICEW), wintypes.DWORD]
+        enum_display_devices.restype = wintypes.BOOL
+
+        enum_display_settings = user32.EnumDisplaySettingsW
+        enum_display_settings.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, ctypes.POINTER(DEVMODEW)]
+        enum_display_settings.restype = wintypes.BOOL
+
+        dev_index = 0
         while True:
-            try:
-                device = win32api.EnumDisplayDevices(None, index, 0)
-            except win32api.error:
+            dd = DISPLAY_DEVICEW()
+            dd.cb = ctypes.sizeof(DISPLAY_DEVICEW)
+            if not enum_display_devices(None, dev_index, ctypes.byref(dd), 0):
                 break
-            index += 1
-            if not (device.StateFlags & win32con.DISPLAY_DEVICE_ATTACHED_TO_DESKTOP):
+            dev_index += 1
+            if not (dd.StateFlags & DISPLAY_DEVICE_ATTACHED_TO_DESKTOP):
+                continue
+            if dd.StateFlags & DISPLAY_DEVICE_MIRRORING_DRIVER:
                 continue
 
-            dev_name = device.DeviceName
-            dev_string = device.DeviceString or dev_name
-            try:
-                settings = win32api.EnumDisplaySettings(dev_name, win32con.ENUM_CURRENT_SETTINGS)
-                x = int(getattr(settings, "Position_x", 0))
-                y = int(getattr(settings, "Position_y", 0))
-                width = int(getattr(settings, "PelsWidth", 0))
-                height = int(getattr(settings, "PelsHeight", 0))
-            except win32api.error:
+            device_name = dd.DeviceName
+            monitor_name = ""
+
+            mon_index = 0
+            while True:
+                md = DISPLAY_DEVICEW()
+                md.cb = ctypes.sizeof(DISPLAY_DEVICEW)
+                if not enum_display_devices(device_name, mon_index, ctypes.byref(md), 0):
+                    break
+                mon_index += 1
+                if md.StateFlags & DISPLAY_DEVICE_ACTIVE or mon_index == 1:
+                    if md.DeviceString:
+                        monitor_name = md.DeviceString
+                        break
+
+            if not monitor_name:
+                monitor_name = dd.DeviceString or device_name
+
+            devmode = DEVMODEW()
+            devmode.dmSize = ctypes.sizeof(DEVMODEW)
+            if enum_display_settings(device_name, ENUM_CURRENT_SETTINGS, ctypes.byref(devmode)):
+                x = int(devmode.dmPosition.x)
+                y = int(devmode.dmPosition.y)
+                width = int(devmode.dmPelsWidth)
+                height = int(devmode.dmPelsHeight)
+            else:
                 x = y = width = height = 0
 
-            is_primary = bool(device.StateFlags & win32con.DISPLAY_DEVICE_PRIMARY_DEVICE)
+            is_primary = bool(dd.StateFlags & DISPLAY_DEVICE_PRIMARY_DEVICE)
             monitors.append(
                 MonitorInfo(
                     index=len(monitors),
-                    name=dev_string,
-                    device_name=dev_name,
+                    name=monitor_name,
+                    device_name=device_name,
                     x=x,
                     y=y,
                     width=width,
