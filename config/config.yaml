@@ -1,3 +1,48 @@
-﻿# WinPos configuration
-log_level: INFO
-poll_interval_ms: 250
+﻿# WinPos example configuration
+version: 1
+
+settings:
+  allow_profile_reentry: false
+  default_timeout_s: 15
+  default_profile: default
+
+monitor_roles:
+  primary:
+    match:
+      is_primary: true
+  secondary:
+    match:
+      index: 1
+
+action_chains:
+  basic_window_setup:
+    - type: wait_for_window
+      params:
+        timeout_s: 10
+    - type: bring_to_foreground
+    - type: move_window_to_monitor
+      params:
+        monitor_role: primary
+    - type: maximize
+
+apps:
+  notepad:
+    display_name: "Notepad"
+    launch:
+      cmd: "notepad.exe"
+    window_match:
+      title_contains: "Notepad"
+    actions:
+      - type: launch_app
+      - type: use_chain
+        params:
+          name: basic_window_setup
+      - type: send_text
+        params:
+          text: "WinPos стартовал."
+          enter_after: true
+
+profiles:
+  default:
+    apps:
+      - notepad

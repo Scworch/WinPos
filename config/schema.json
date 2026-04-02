@@ -1,0 +1,109 @@
+﻿{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "WinPos Config Schema",
+  "type": "object",
+  "required": ["version", "apps", "profiles"],
+  "properties": {
+    "version": {"type": "integer", "minimum": 1},
+    "settings": {
+      "type": "object",
+      "properties": {
+        "allow_profile_reentry": {"type": "boolean"},
+        "default_timeout_s": {"type": "number", "minimum": 1},
+        "default_profile": {"type": "string"}
+      },
+      "additionalProperties": false
+    },
+    "monitor_roles": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "match": {
+            "type": "object",
+            "properties": {
+              "is_primary": {"type": "boolean"},
+              "index": {"type": "integer", "minimum": 0},
+              "name_contains": {"type": "string"}
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "action_chains": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": {"$ref": "#/definitions/action"}
+      }
+    },
+    "apps": {
+      "type": "object",
+      "additionalProperties": {"$ref": "#/definitions/app"}
+    },
+    "profiles": {
+      "type": "object",
+      "additionalProperties": {"$ref": "#/definitions/profile"}
+    }
+  },
+  "definitions": {
+    "app": {
+      "type": "object",
+      "properties": {
+        "display_name": {"type": "string"},
+        "launch": {
+          "type": "object",
+          "properties": {
+            "cmd": {"type": "string"},
+            "args": {"type": "array", "items": {"type": "string"}},
+            "cwd": {"type": "string"}
+          },
+          "required": ["cmd"],
+          "additionalProperties": false
+        },
+        "window_match": {
+          "type": "object",
+          "properties": {
+            "title_contains": {"type": "string"},
+            "title_equals": {"type": "string"},
+            "class_name": {"type": "string"},
+            "process_name": {"type": "string"}
+          },
+          "additionalProperties": false
+        },
+        "actions": {
+          "type": "array",
+          "items": {"$ref": "#/definitions/action"}
+        }
+      },
+      "additionalProperties": false
+    },
+    "profile": {
+      "type": "object",
+      "properties": {
+        "apps": {"type": "array", "items": {"type": "string"}},
+        "allow_parallel": {"type": "boolean"}
+      },
+      "required": ["apps"],
+      "additionalProperties": false
+    },
+    "action": {
+      "type": "object",
+      "properties": {
+        "type": {"type": "string"},
+        "params": {"type": "object"},
+        "when": {"type": "object"},
+        "retry": {"type": "object"},
+        "on_failure": {
+          "type": "array",
+          "items": {"$ref": "#/definitions/action"}
+        }
+      },
+      "required": ["type"],
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

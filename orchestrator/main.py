@@ -3,57 +3,72 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from pathlib import Path
 
-from modules.launcher import Launcher
-from modules.monitor_manager import MonitorManager
-from modules.window_manager import WindowManager
-from modules.ui_queue import UIQueue
-from utils.waiters import wait_until
+from config.manager import ConfigManager
+from logging_system.logger import setup_logging
+from orchestrator.job_guard import JobGuard
+from orchestrator.scheduler import Scheduler
+from launcher.launcher import Launcher
+from monitors.monitor_manager import MonitorManager
+from windows.window_manager import WindowManager
+from ui.action_queue import UIQueue
+from state.state_manager import StateManager
+from recovery.watchdog import Watchdog
+from registry.app_registry import AppRegistry
 
 
-CONFIG_PATH = Path(__file__).resolve().parents[1] / "config" / "config.yaml"
+ROOT = Path(__file__).resolve().parents[1]
+CONFIG_PATH = ROOT / "config" / "config.yaml"
+LOG_DIR = ROOT / "logs"
+LOCK_DIR = ROOT / "state" / "locks"
 
 
-def load_config(path: Path) -> dict:
-    """Load a minimal key: value config without extra dependencies."""
-    defaults = {
-        "log_level": "INFO",
-        "poll_interval_ms": 250,
-    }
-
-    if not path.exists():
-        return defaults
-
-    data: dict[str, str | int] = {}
-    with path.open("r", encoding="utf-8") as handle:
-        for raw in handle:
-            line = raw.strip()
-            if not line or line.startswith("#") or ":" not in line:
-                continue
-            key, value = [part.strip() for part in line.split(":", 1)]
-            if value.isdigit():
-                data[key] = int(value)
-            else:
-                data[key] = value.strip(\"\\\"'\")
-
-    return {**defaults, **data}
+def _select_profile(config_manager: ConfigManager) -> str:
+    raw_settings = (config_manager.raw or {}).get("settings", {}) if config_manager.raw else {}
+    return str(raw_settings.get("default_profile", "default"))
 
 
 async def main() -> None:
-    config = load_config(CONFIG_PATH)
+    config_manager = ConfigManager(CONFIG_PATH)
+    config = config_manager.load()
 
-    ui_queue = UIQueue()
-    launcher = Launcher(ui_queue=ui_queue)
-    window_manager = WindowManager(ui_queue=ui_queue)
-    monitor_manager = MonitorManager(ui_queue=ui_queue)
+    setup_logging(LOG_DIR, level="INFO")
+    logger = logging.getLogger("orchestrator")
 
-    # Basic startup sequence; replace with real workflow.
-    await launcher.initialize(config)
-    await monitor_manager.refresh()
-    await window_manager.refresh()
+    profile_id = _select_profile(config_manager)
+    guard = JobGuard(lock_dir=LOCK_DIR)
+    if not config.settings.allow_profile_reentry and not guard.acquire(profile_id):
+        logger.warning("Profile '%s' already running", profile_id)
+        return
 
-    await wait_until(lambda: ui_queue.empty(), timeout_s=2.0)
+    try:
+        monitor_manager = MonitorManager(config.monitor_roles)
+        monitor_manager.refresh()
+
+        scheduler = Scheduler(
+            config=config,
+            launcher=Launcher(),
+            window_manager=WindowManager(),
+            monitor_manager=monitor_manager,
+            ui_queue=UIQueue(),
+            state_manager=StateManager(),
+            watchdog=Watchdog(),
+        )
+
+        ui_task = asyncio.create_task(scheduler.ui_queue.run())
+        registry = AppRegistry.from_config(config)
+        apps = registry.list_apps_for_profile(profile_id)
+        await scheduler.run_profile(profile_id, apps)
+
+        await scheduler.ui_queue.stop()
+        ui_task.cancel()
+
+        summary = scheduler.state_manager.summary()
+        logger.info("Run summary: %s", summary)
+    finally:
+        guard.release()
 
 
 if __name__ == "__main__":

@@ -10,4 +10,5 @@ PyRect==0.2.0
 PyScreeze==1.0.1
 pytweening==1.2.0
 pywin32==311
+PyYAML==6.0.3
 screeninfo==0.8.1
