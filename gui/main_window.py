@@ -405,34 +405,23 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, "Проверка", "Ошибок не найдено")
 
     def _build_monitor_role_options(self) -> List[Dict[str, str]]:
-        roles = []
+        roles: List[Dict[str, str]] = []
         role_map = self.data.setdefault("monitor_roles", {})
         manager = MonitorManager(role_map)
         try:
             manager.refresh()
         except Exception:
-            manager = None
-        if manager:
-            existing_indexes = {
-                cfg.get("match", {}).get("index")
-                for cfg in role_map.values()
-                if isinstance(cfg, dict)
-            }
-            for monitor in manager.get_all():
-                if monitor.index in existing_indexes:
-                    continue
-                role_name = f"monitor_{monitor.index + 1}"
-                if role_name not in role_map:
-                    role_map[role_name] = {"match": {"index": monitor.index}}
-        for role, cfg in role_map.items():
-            label = role
-            if manager:
-                monitor = manager.get_by_role(role)
-                if monitor:
-                    label = f"{monitor.name} ({monitor.width}x{monitor.height})"
-                else:
-                    label = "Монитор не найден"
-            roles.append({"label": label, "value": role})
+            return roles
+
+        # Всегда строим список напрямую по обнаруженным мониторам
+        for monitor in manager.get_all():
+            role_name = f"monitor_{monitor.index + 1}"
+            if role_name not in role_map:
+                role_map[role_name] = {"match": {"index": monitor.index}}
+            name = monitor.name or f"Монитор {monitor.index + 1}"
+            label = f"{name} ({monitor.width}x{monitor.height})"
+            roles.append({"label": label, "value": role_name})
+
         return roles
 
 
