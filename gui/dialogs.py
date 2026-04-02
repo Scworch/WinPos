@@ -70,9 +70,9 @@ ACTION_DEFS: Dict[str, Dict[str, Any]] = {
         "fields": [
             {
                 "name": "monitor_role",
-                "label": "Роль монитора",
+                "label": "Монитор",
                 "type": "role",
-                "help": "Например primary, secondary, third.",
+                "help": "Выберите физический монитор из списка.",
             }
         ],
     },
@@ -82,9 +82,9 @@ ACTION_DEFS: Dict[str, Dict[str, Any]] = {
         "fields": [
             {
                 "name": "monitor_role",
-                "label": "Роль монитора",
+                "label": "Монитор",
                 "type": "role",
-                "help": "Например primary, secondary, third.",
+                "help": "Выберите физический монитор из списка.",
             }
         ],
     },

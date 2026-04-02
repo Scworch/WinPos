@@ -425,22 +425,13 @@ class MainWindow(QMainWindow):
                 if role_name not in role_map:
                     role_map[role_name] = {"match": {"index": monitor.index}}
         for role, cfg in role_map.items():
-            match = (cfg or {}).get("match", {})
-            parts = []
-            if "is_primary" in match:
-                parts.append("основной" if match.get("is_primary") else "не основной")
-            if "index" in match:
-                parts.append(f"индекс {match.get('index')}")
-            if "name_contains" in match:
-                parts.append(f"имя содержит '{match.get('name_contains')}'")
-            suffix = f" ({', '.join(parts)})" if parts else ""
-            label = f"{role}{suffix}"
+            label = role
             if manager:
                 monitor = manager.get_by_role(role)
                 if monitor:
-                    label = f"{role} — {monitor.name} ({monitor.width}x{monitor.height})"
+                    label = f"{monitor.name} ({monitor.width}x{monitor.height})"
                 else:
-                    label = f"{role} — нет соответствия"
+                    label = "Монитор не найден"
             roles.append({"label": label, "value": role})
         return roles
 
