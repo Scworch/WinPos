@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (
 )
 
 from gui.config_store import ConfigStore
-from gui.dialogs import AppDialog, ActionDialog, ProfileDialog
+from gui.dialogs import AppDialog, ActionDialog, ProfileDialog, ACTION_DEFS
 from gui.components.toolbar import ToolbarWidget
 from gui.components.profiles_panel import ProfilesPanel
 from gui.components.applications_panel import ApplicationsPanel
@@ -243,7 +243,9 @@ class MainWindow(QMainWindow):
         summary = ""
         if params:
             summary = ", ".join(f"{k}={v}" for k, v in params.items())
-        return f"{action.get('type', '')} {summary}".strip()
+        action_type = action.get("type", "")
+        label = ACTION_DEFS.get(action_type, {}).get("label", action_type)
+        return f"{label} {summary}".strip()
 
     def _update_preview(self, app: Dict[str, Any]) -> None:
         actions = app.get("actions", []) or []
@@ -305,7 +307,10 @@ class MainWindow(QMainWindow):
         app = self._current_app()
         if not app:
             return
-        dialog = ActionDialog()
+        dialog = ActionDialog(
+            monitor_roles=list((self.data.get("monitor_roles") or {}).keys()),
+            chain_names=list((self.data.get("action_chains") or {}).keys()),
+        )
         action = dialog.get_action()
         if not action:
             return
@@ -321,7 +326,11 @@ class MainWindow(QMainWindow):
         if row < 0:
             return
         actions = app.get("actions", [])
-        dialog = ActionDialog(action=actions[row])
+        dialog = ActionDialog(
+            action=actions[row],
+            monitor_roles=list((self.data.get("monitor_roles") or {}).keys()),
+            chain_names=list((self.data.get("action_chains") or {}).keys()),
+        )
         action = dialog.get_action()
         if not action:
             return

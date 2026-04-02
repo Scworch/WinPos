@@ -41,20 +41,20 @@ def main() -> int:
         #CardSurface {
             background: #FFFFFF;
             border: 1px solid #E7E0EC;
-            border-radius: 24px;
+            border-radius: 8px;
         }
         QListWidget, QPlainTextEdit {
             background: #FFFFFF;
             border: 1px solid #E7E0EC;
-            border-radius: 18px;
+            border-radius: 6px;
             padding: 6px;
         }
         QLineEdit, QComboBox {
             background: #FFFFFF;
             border: none;
             border-bottom: 2px solid #CAC4D0;
-            border-top-left-radius: 12px;
-            border-top-right-radius: 12px;
+            border-top-left-radius: 6px;
+            border-top-right-radius: 6px;
             padding: 6px 8px;
         }
         QLineEdit:focus, QComboBox:focus {
@@ -63,7 +63,7 @@ def main() -> int:
         QPushButton {
             background: #FFFFFF;
             border: 1px solid #E0E0E0;
-            border-radius: 12px;
+            border-radius: 6px;
             padding: 6px 12px;
         }
         QPushButton:hover {
@@ -79,7 +79,7 @@ def main() -> int:
             padding: 4px 6px;
         }
         #MaterialButton {
-            border-radius: 9999px;
+            border-radius: 6px;
             padding: 8px 16px;
         }
         #MaterialButton:hover {

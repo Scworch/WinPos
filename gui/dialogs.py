@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional
 
 import yaml
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QDoubleValidator, QIntValidator
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -21,25 +22,187 @@ from PySide6.QtWidgets import (
     QPushButton,
     QPlainTextEdit,
     QVBoxLayout,
+    QWidget,
 )
 
 
-ACTION_TYPES = [
-    "launch_app",
-    "wait_for_process",
-    "wait_for_window",
-    "bring_to_foreground",
-    "move_window_to_monitor",
-    "center_window",
-    "resize_window",
-    "maximize",
-    "minimize",
-    "send_hotkeys",
-    "send_text",
-    "open_url",
-    "wait_for_title_change",
-    "wait_for_visibility",
-    "use_chain",
+ACTION_DEFS: Dict[str, Dict[str, Any]] = {
+    "launch_app": {
+        "label": "Запуск приложения",
+        "desc": "Запускает приложение, если оно ещё не запущено.",
+        "fields": [],
+    },
+    "wait_for_process": {
+        "label": "Ожидание процесса",
+        "desc": "Ожидает появления процесса приложения.",
+        "fields": [
+            {
+                "name": "timeout_s",
+                "label": "Таймаут (сек)",
+                "type": "float",
+                "help": "Сколько ждать процесс (например 10).",
+            }
+        ],
+    },
+    "wait_for_window": {
+        "label": "Ожидание окна",
+        "desc": "Ожидает появления окна по правилам window_match.",
+        "fields": [
+            {
+                "name": "timeout_s",
+                "label": "Таймаут (сек)",
+                "type": "float",
+                "help": "Сколько ждать окно (например 10).",
+            }
+        ],
+    },
+    "bring_to_foreground": {
+        "label": "На передний план",
+        "desc": "Выводит окно на передний план и активирует его.",
+        "fields": [],
+    },
+    "move_window_to_monitor": {
+        "label": "Переместить на монитор",
+        "desc": "Перемещает окно на монитор с выбранной ролью.",
+        "fields": [
+            {
+                "name": "monitor_role",
+                "label": "Роль монитора",
+                "type": "role",
+                "help": "Например primary, secondary, third.",
+            }
+        ],
+    },
+    "center_window": {
+        "label": "Центрировать окно",
+        "desc": "Центрирует окно на выбранном мониторе.",
+        "fields": [
+            {
+                "name": "monitor_role",
+                "label": "Роль монитора",
+                "type": "role",
+                "help": "Например primary, secondary, third.",
+            }
+        ],
+    },
+    "resize_window": {
+        "label": "Изменить размер",
+        "desc": "Меняет размер окна на указанные значения.",
+        "fields": [
+            {
+                "name": "width",
+                "label": "Ширина (px)",
+                "type": "int",
+                "help": "Например 1280.",
+            },
+            {
+                "name": "height",
+                "label": "Высота (px)",
+                "type": "int",
+                "help": "Например 720.",
+            },
+        ],
+    },
+    "maximize": {
+        "label": "Развернуть",
+        "desc": "Разворачивает окно на весь экран.",
+        "fields": [],
+    },
+    "minimize": {
+        "label": "Свернуть",
+        "desc": "Сворачивает окно в панель задач.",
+        "fields": [],
+    },
+    "send_hotkeys": {
+        "label": "Горячие клавиши",
+        "desc": "Отправляет комбинацию клавиш в активное окно.",
+        "fields": [
+            {
+                "name": "keys",
+                "label": "Комбинация",
+                "type": "str",
+                "help": "Примеры: ctrl+shift+p, alt+f4.",
+            }
+        ],
+    },
+    "send_text": {
+        "label": "Ввод текста",
+        "desc": "Вводит текст в активное окно.",
+        "fields": [
+            {
+                "name": "text",
+                "label": "Текст",
+                "type": "text",
+                "help": "Текст будет введён в активное окно.",
+            },
+            {
+                "name": "enter_after",
+                "label": "Нажать Enter",
+                "type": "bool",
+                "help": "Если включено, нажимается Enter после ввода.",
+            },
+        ],
+    },
+    "open_url": {
+        "label": "Открыть ссылку",
+        "desc": "Открывает URL или deep‑link в браузере/приложении.",
+        "fields": [
+            {
+                "name": "url",
+                "label": "URL/ссылка",
+                "type": "str",
+                "help": "Пример: https://example.com или app://route.",
+            }
+        ],
+    },
+    "wait_for_title_change": {
+        "label": "Ожидание заголовка",
+        "desc": "Ждёт, когда в заголовке окна появится нужный текст.",
+        "fields": [
+            {
+                "name": "contains",
+                "label": "Текст в заголовке",
+                "type": "str",
+                "help": "Например: Документ или Сохранено.",
+            },
+            {
+                "name": "timeout_s",
+                "label": "Таймаут (сек)",
+                "type": "float",
+                "help": "Сколько ждать изменения заголовка.",
+            },
+        ],
+    },
+    "wait_for_visibility": {
+        "label": "Ожидание видимости",
+        "desc": "Ждёт, пока окно станет видимым.",
+        "fields": [
+            {
+                "name": "timeout_s",
+                "label": "Таймаут (сек)",
+                "type": "float",
+                "help": "Сколько ждать видимость окна.",
+            }
+        ],
+    },
+    "use_chain": {
+        "label": "Использовать цепочку",
+        "desc": "Запускает заранее описанную цепочку действий.",
+        "fields": [
+            {
+                "name": "name",
+                "label": "Имя цепочки",
+                "type": "chain",
+                "help": "Имя цепочки из action_chains.",
+            }
+        ],
+    },
+}
+
+CONDITION_OPTIONS = [
+    ("Без условия", None),
+    ("Если процесс запущен", "process_running"),
+    ("Если окно найдено", "window_exists"),
 ]
 
 
@@ -67,6 +230,10 @@ class AppDialog(QDialog):
         self.apply_window_btn = QPushButton("Заполнить из окна")
         self.refresh_windows_btn.clicked.connect(self._refresh_windows)
         self.apply_window_btn.clicked.connect(self._apply_window_selection)
+
+        self.window_combo.setToolTip("Выберите окно из запущенных приложений.")
+        self.apply_window_btn.setToolTip("Заполнит поля window_match по выбранному окну.")
+        self.refresh_windows_btn.setToolTip("Обновить список видимых окон.")
 
         form = QFormLayout()
         form.addRow("ID", self.app_id_edit)
@@ -153,40 +320,87 @@ class AppDialog(QDialog):
 
 
 class ActionDialog(QDialog):
-    def __init__(self, action: Optional[Dict[str, Any]] = None) -> None:
+    def __init__(
+        self,
+        action: Optional[Dict[str, Any]] = None,
+        monitor_roles: Optional[List[str]] = None,
+        chain_names: Optional[List[str]] = None,
+        allow_fallback: bool = True,
+    ) -> None:
         super().__init__()
         self.setWindowTitle("Действие")
-        action = action or {}
+        self._action = action or {}
+        self._monitor_roles = monitor_roles or []
+        self._chain_names = chain_names or []
+        self._allow_fallback = allow_fallback
+        self._field_widgets: Dict[str, QWidget] = {}
 
         self.type_combo = QComboBox()
-        self.type_combo.addItems(ACTION_TYPES)
-        if action.get("type"):
-            index = self.type_combo.findText(action["type"])
-            if index >= 0:
-                self.type_combo.setCurrentIndex(index)
+        for action_id, info in ACTION_DEFS.items():
+            self.type_combo.addItem(info["label"], action_id)
+        self.type_combo.currentIndexChanged.connect(self._on_type_changed)
+        self.type_combo.setToolTip("Выберите тип действия.")
 
-        self.params_edit = QPlainTextEdit()
-        self.params_edit.setPlaceholderText("params: { key: value }")
-        self.params_edit.setPlainText(_dump_yaml(action.get("params")))
+        self.description = QLabel("")
+        self.description.setWordWrap(True)
 
-        self.when_edit = QPlainTextEdit()
-        self.when_edit.setPlaceholderText("when: { type: process_running }")
-        self.when_edit.setPlainText(_dump_yaml(action.get("when")))
+        self.params_container = QWidget()
+        self.params_form = QFormLayout()
+        self.params_container.setLayout(self.params_form)
 
-        self.retry_edit = QPlainTextEdit()
-        self.retry_edit.setPlaceholderText("retry: { retries: 2, delay_s: 0.5 }")
-        self.retry_edit.setPlainText(_dump_yaml(action.get("retry")))
+        self.condition_combo = QComboBox()
+        for label, value in CONDITION_OPTIONS:
+            self.condition_combo.addItem(label, value)
+        self.condition_combo.setToolTip("Условие выполнения действия.")
 
-        self.on_failure_edit = QPlainTextEdit()
-        self.on_failure_edit.setPlaceholderText("- type: minimize")
-        self.on_failure_edit.setPlainText(_dump_yaml(action.get("on_failure")))
+        self.retry_enabled = QCheckBox("Повторы при ошибке")
+        self.retry_enabled.setToolTip("Если действие не удалось, повторить его.")
+        self.retry_count = QLineEdit()
+        self.retry_count.setPlaceholderText("2")
+        self.retry_count.setValidator(QIntValidator(0, 10))
+        self.retry_count.setToolTip("Сколько повторов выполнить.")
+        self.retry_delay = QLineEdit()
+        self.retry_delay.setPlaceholderText("0.5")
+        self.retry_delay.setValidator(QDoubleValidator(0.0, 60.0, 2))
+        self.retry_delay.setToolTip("Пауза между повторами (сек).")
+
+        self.fallback_list = QListWidget()
+        self.add_fallback_btn = QPushButton("Добавить fallback")
+        self.edit_fallback_btn = QPushButton("Изменить")
+        self.remove_fallback_btn = QPushButton("Удалить")
+        self.add_fallback_btn.setToolTip("Действия, которые выполняются при ошибке.")
+        self.edit_fallback_btn.setToolTip("Редактировать выбранный fallback.")
+        self.remove_fallback_btn.setToolTip("Удалить выбранный fallback.")
+
+        self.add_fallback_btn.clicked.connect(self.add_fallback)
+        self.edit_fallback_btn.clicked.connect(self.edit_fallback)
+        self.remove_fallback_btn.clicked.connect(self.remove_fallback)
 
         form = QFormLayout()
         form.addRow("Тип", self.type_combo)
-        form.addRow("Параметры (YAML)", self.params_edit)
-        form.addRow("Условия (YAML)", self.when_edit)
-        form.addRow("Retry (YAML)", self.retry_edit)
-        form.addRow("Fallback (YAML список)", self.on_failure_edit)
+        form.addRow("Описание", self.description)
+        form.addRow("Параметры", self.params_container)
+        form.addRow("Условие", self.condition_combo)
+
+        retry_row = QHBoxLayout()
+        retry_row.addWidget(self.retry_enabled)
+        retry_row.addWidget(QLabel("Повторы"))
+        retry_row.addWidget(self.retry_count)
+        retry_row.addWidget(QLabel("Пауза (сек)"))
+        retry_row.addWidget(self.retry_delay)
+        form.addRow("Повторы", retry_row)
+
+        if self._allow_fallback:
+            fallback_row = QHBoxLayout()
+            fallback_row.addWidget(self.add_fallback_btn)
+            fallback_row.addWidget(self.edit_fallback_btn)
+            fallback_row.addWidget(self.remove_fallback_btn)
+            fallback_box = QVBoxLayout()
+            fallback_box.addWidget(self.fallback_list)
+            fallback_box.addLayout(fallback_row)
+            fallback_container = QWidget()
+            fallback_container.setLayout(fallback_box)
+            form.addRow("Fallback", fallback_container)
 
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         buttons.accepted.connect(self.accept)
@@ -197,17 +411,196 @@ class ActionDialog(QDialog):
         layout.addWidget(buttons)
         self.setLayout(layout)
 
+        self._load_action(self._action)
+
+    def _load_action(self, action: Dict[str, Any]) -> None:
+        action_type = action.get("type", "launch_app")
+        index = self._find_type_index(action_type)
+        if index >= 0:
+            self.type_combo.setCurrentIndex(index)
+        self._build_fields(action_type, action.get("params", {}))
+        when = action.get("when") or {}
+        when_type = when.get("type")
+        for idx in range(self.condition_combo.count()):
+            if self.condition_combo.itemData(idx) == when_type:
+                self.condition_combo.setCurrentIndex(idx)
+                break
+        retry = action.get("retry") or {}
+        if retry:
+            self.retry_enabled.setChecked(True)
+            self.retry_count.setText(str(retry.get("retries", "")))
+            self.retry_delay.setText(str(retry.get("delay_s", "")))
+        if self._allow_fallback:
+            for item in action.get("on_failure", []) or []:
+                self._add_fallback_item(item)
+
+    def _find_type_index(self, action_type: str) -> int:
+        for idx in range(self.type_combo.count()):
+            if self.type_combo.itemData(idx) == action_type:
+                return idx
+        return -1
+
+    def _on_type_changed(self) -> None:
+        action_type = self.type_combo.currentData()
+        info = ACTION_DEFS.get(action_type, {})
+        self.description.setText(info.get("desc", ""))
+        self._build_fields(action_type, {})
+
+    def _clear_layout(self, layout: QFormLayout) -> None:
+        while layout.count():
+            item = layout.takeAt(0)
+            widget = item.widget()
+            if widget:
+                widget.deleteLater()
+
+    def _build_fields(self, action_type: str, params: Dict[str, Any]) -> None:
+        self._field_widgets.clear()
+        self._clear_layout(self.params_form)
+        info = ACTION_DEFS.get(action_type, {})
+        self.description.setText(info.get("desc", ""))
+
+        for field in info.get("fields", []):
+            widget: QWidget
+            ftype = field.get("type")
+            label_text = field.get("label", field.get("name"))
+            help_text = field.get("help", "")
+            label = QLabel(label_text)
+            if help_text:
+                label.setToolTip(help_text)
+
+            if ftype == "text":
+                widget = QPlainTextEdit()
+                widget.setToolTip(help_text)
+                if params.get(field["name"]):
+                    widget.setPlainText(str(params.get(field["name"])))
+            elif ftype == "bool":
+                widget = QCheckBox("Включено")
+                widget.setToolTip(help_text)
+                widget.setChecked(bool(params.get(field["name"], False)))
+            elif ftype == "int":
+                widget = QLineEdit(str(params.get(field["name"], "")))
+                widget.setValidator(QIntValidator(0, 100000))
+                widget.setToolTip(help_text)
+            elif ftype == "float":
+                widget = QLineEdit(str(params.get(field["name"], "")))
+                widget.setValidator(QDoubleValidator(0.0, 100000.0, 2))
+                widget.setToolTip(help_text)
+            elif ftype == "role":
+                combo = QComboBox()
+                combo.setEditable(True)
+                for role in self._monitor_roles:
+                    combo.addItem(role)
+                current = str(params.get(field["name"], ""))
+                if current:
+                    combo.setCurrentText(current)
+                combo.setToolTip(help_text)
+                widget = combo
+            elif ftype == "chain":
+                combo = QComboBox()
+                combo.setEditable(True)
+                for chain in self._chain_names:
+                    combo.addItem(chain)
+                current = str(params.get(field["name"], ""))
+                if current:
+                    combo.setCurrentText(current)
+                combo.setToolTip(help_text)
+                widget = combo
+            else:
+                widget = QLineEdit(str(params.get(field["name"], "")))
+                widget.setToolTip(help_text)
+            self.params_form.addRow(label, widget)
+            self._field_widgets[field["name"]] = widget
+
+    def _collect_params(self) -> Optional[Dict[str, Any]]:
+        action_type = self.type_combo.currentData()
+        info = ACTION_DEFS.get(action_type, {})
+        params: Dict[str, Any] = {}
+        for field in info.get("fields", []):
+            name = field["name"]
+            ftype = field.get("type")
+            widget = self._field_widgets.get(name)
+            if widget is None:
+                continue
+            if ftype == "text":
+                value = widget.toPlainText().strip()  # type: ignore[union-attr]
+            elif ftype == "bool":
+                value = bool(widget.isChecked())  # type: ignore[union-attr]
+                if not value:
+                    continue
+            elif ftype in ("int", "float"):
+                raw = widget.text().strip()  # type: ignore[union-attr]
+                if not raw:
+                    continue
+                try:
+                    value = int(raw) if ftype == "int" else float(raw)
+                except ValueError:
+                    QMessageBox.warning(self, "Ошибка", f"Некорректное значение: {name}")
+                    return None
+            else:
+                value = widget.currentText().strip() if hasattr(widget, "currentText") else widget.text().strip()  # type: ignore[union-attr]
+                if not value:
+                    continue
+            params[name] = value
+        return params
+
+    def _add_fallback_item(self, action: Dict[str, Any]) -> None:
+        label = _format_action(action)
+        item = QListWidgetItem(label)
+        item.setData(Qt.UserRole, action)
+        self.fallback_list.addItem(item)
+
+    def add_fallback(self) -> None:
+        dialog = ActionDialog(monitor_roles=self._monitor_roles, chain_names=self._chain_names, allow_fallback=False)
+        action = dialog.get_action()
+        if action:
+            self._add_fallback_item(action)
+
+    def edit_fallback(self) -> None:
+        row = self.fallback_list.currentRow()
+        if row < 0:
+            return
+        item = self.fallback_list.item(row)
+        action = item.data(Qt.UserRole)
+        dialog = ActionDialog(action=action, monitor_roles=self._monitor_roles, chain_names=self._chain_names, allow_fallback=False)
+        updated = dialog.get_action()
+        if updated:
+            item.setText(_format_action(updated))
+            item.setData(Qt.UserRole, updated)
+
+    def remove_fallback(self) -> None:
+        row = self.fallback_list.currentRow()
+        if row < 0:
+            return
+        self.fallback_list.takeItem(row)
+
     def get_action(self) -> Optional[Dict[str, Any]]:
         if self.exec() != QDialog.Accepted:
             return None
-        action = {
-            "type": self.type_combo.currentText(),
-            "params": _load_yaml(self.params_edit.toPlainText()),
-            "when": _load_yaml(self.when_edit.toPlainText()),
-            "retry": _load_yaml(self.retry_edit.toPlainText()),
-            "on_failure": _load_yaml(self.on_failure_edit.toPlainText()) or [],
-        }
-        action = {k: v for k, v in action.items() if v}
+        action_type = self.type_combo.currentData()
+        params = self._collect_params()
+        if params is None:
+            return None
+
+        action: Dict[str, Any] = {"type": action_type}
+        if params:
+            action["params"] = params
+
+        condition = self.condition_combo.currentData()
+        if condition:
+            action["when"] = {"type": condition}
+
+        if self.retry_enabled.isChecked():
+            retries = int(self.retry_count.text() or "1")
+            delay = float(self.retry_delay.text() or "0.5")
+            action["retry"] = {"retries": retries, "delay_s": delay}
+
+        if self._allow_fallback:
+            fallbacks = []
+            for idx in range(self.fallback_list.count()):
+                item = self.fallback_list.item(idx)
+                fallbacks.append(item.data(Qt.UserRole))
+            if fallbacks:
+                action["on_failure"] = fallbacks
         return action
 
 
@@ -252,6 +645,16 @@ class ProfileDialog(QDialog):
             "apps": apps,
             "allow_parallel": self.allow_parallel.isChecked(),
         }
+
+
+def _format_action(action: Dict[str, Any]) -> str:
+    params = action.get("params") or {}
+    summary = ""
+    if params:
+        summary = ", ".join(f"{k}={v}" for k, v in params.items())
+    action_type = action.get("type", "")
+    label = ACTION_DEFS.get(action_type, {}).get("label", action_type)
+    return f"{label} {summary}".strip()
 
 
 def _dump_yaml(value: Any) -> str:

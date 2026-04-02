@@ -40,7 +40,7 @@ class MaterialCard(QFrame):
         self.surface.setObjectName("CardSurface")
 
         outer = QVBoxLayout(self)
-        outer.setContentsMargins(10, 10, 10, 10)
+        outer.setContentsMargins(12, 12, 12, 12)
         outer.addWidget(self.surface)
 
         self.body = QVBoxLayout(self.surface)
