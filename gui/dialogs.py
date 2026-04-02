@@ -397,7 +397,7 @@ class ActionDialog(QDialog):
     def __init__(
         self,
         action: Optional[Dict[str, Any]] = None,
-        monitor_roles: Optional[List[str]] = None,
+        monitor_roles: Optional[List[Dict[str, str]]] = None,
         chain_names: Optional[List[str]] = None,
         allow_fallback: bool = True,
     ) -> None:
@@ -561,12 +561,15 @@ class ActionDialog(QDialog):
                 widget.setToolTip(help_text)
             elif ftype == "role":
                 combo = QComboBox()
-                combo.setEditable(True)
+                combo.setEditable(False)
                 for role in self._monitor_roles:
-                    combo.addItem(role)
+                    combo.addItem(role["label"], role["value"])
                 current = str(params.get(field["name"], ""))
                 if current:
-                    combo.setCurrentText(current)
+                    for idx in range(combo.count()):
+                        if combo.itemData(idx) == current:
+                            combo.setCurrentIndex(idx)
+                            break
                 combo.setToolTip(help_text)
                 widget = combo
             elif ftype == "chain":
@@ -611,7 +614,11 @@ class ActionDialog(QDialog):
                     QMessageBox.warning(self, "Ошибка", f"Некорректное значение: {name}")
                     return None
             else:
-                value = widget.currentText().strip() if hasattr(widget, "currentText") else widget.text().strip()  # type: ignore[union-attr]
+                if isinstance(widget, QComboBox):
+                    data = widget.currentData()
+                    value = str(data) if data is not None else widget.currentText().strip()
+                else:
+                    value = widget.text().strip()  # type: ignore[union-attr]
                 if not value:
                     continue
             params[name] = value

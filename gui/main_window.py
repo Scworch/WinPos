@@ -308,7 +308,7 @@ class MainWindow(QMainWindow):
         if not app:
             return
         dialog = ActionDialog(
-            monitor_roles=list((self.data.get("monitor_roles") or {}).keys()),
+            monitor_roles=self._build_monitor_role_options(),
             chain_names=list((self.data.get("action_chains") or {}).keys()),
         )
         action = dialog.get_action()
@@ -328,7 +328,7 @@ class MainWindow(QMainWindow):
         actions = app.get("actions", [])
         dialog = ActionDialog(
             action=actions[row],
-            monitor_roles=list((self.data.get("monitor_roles") or {}).keys()),
+            monitor_roles=self._build_monitor_role_options(),
             chain_names=list((self.data.get("action_chains") or {}).keys()),
         )
         action = dialog.get_action()
@@ -402,6 +402,22 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Проверка", "; ".join(issues))
         else:
             QMessageBox.information(self, "Проверка", "Ошибок не найдено")
+
+    def _build_monitor_role_options(self) -> List[Dict[str, str]]:
+        roles = []
+        role_map = self.data.get("monitor_roles") or {}
+        for role, cfg in role_map.items():
+            match = (cfg or {}).get("match", {})
+            parts = []
+            if "is_primary" in match:
+                parts.append("основной" if match.get("is_primary") else "не основной")
+            if "index" in match:
+                parts.append(f"индекс {match.get('index')}")
+            if "name_contains" in match:
+                parts.append(f"имя содержит '{match.get('name_contains')}'")
+            suffix = f" ({', '.join(parts)})" if parts else ""
+            roles.append({"label": f"{role}{suffix}", "value": role})
+        return roles
 
 
 def _prompt_text(parent: QWidget, title: str, label: str) -> tuple[str, bool]:
