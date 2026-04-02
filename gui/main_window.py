@@ -406,12 +406,24 @@ class MainWindow(QMainWindow):
 
     def _build_monitor_role_options(self) -> List[Dict[str, str]]:
         roles = []
-        role_map = self.data.get("monitor_roles") or {}
+        role_map = self.data.setdefault("monitor_roles", {})
         manager = MonitorManager(role_map)
         try:
             manager.refresh()
         except Exception:
             manager = None
+        if manager:
+            existing_indexes = {
+                cfg.get("match", {}).get("index")
+                for cfg in role_map.values()
+                if isinstance(cfg, dict)
+            }
+            for monitor in manager.get_all():
+                if monitor.index in existing_indexes:
+                    continue
+                role_name = f"monitor_{monitor.index + 1}"
+                if role_name not in role_map:
+                    role_map[role_name] = {"match": {"index": monitor.index}}
         for role, cfg in role_map.items():
             match = (cfg or {}).get("match", {})
             parts = []
