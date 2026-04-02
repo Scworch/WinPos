@@ -15,9 +15,43 @@ def main() -> int:
     app = QApplication(sys.argv)
     app.setOrganizationName("Scworch")
     app.setApplicationName("WinPos")
+    app.setQuitOnLastWindowClosed(False)
 
     app.setStyleSheet(
-        \"\"\"\n        QWidget {\n            background: #F5F5F5;\n            color: #1F1F1F;\n            font-size: 13px;\n        }\n        QToolBar {\n            background: #EFEFEF;\n            border-bottom: 1px solid #E0E0E0;\n        }\n        QListWidget, QPlainTextEdit, QComboBox, QLineEdit {\n            background: #FFFFFF;\n            border: 1px solid #E0E0E0;\n            border-radius: 6px;\n            padding: 4px;\n        }\n        QPushButton {\n            background: #FFFFFF;\n            border: 1px solid #DADADA;\n            border-radius: 6px;\n            padding: 6px 10px;\n        }\n        QPushButton:hover {\n            border-color: #3A86FF;\n        }\n        QListWidget::item:selected {\n            background: #3A86FF;\n            color: #FFFFFF;\n        }\n        QComboBox::drop-down {\n            border: none;\n        }\n        \"\"\"\n    )
+        """
+        QWidget {
+            background: #F5F5F5;
+            color: #1F1F1F;
+            font-size: 13px;
+        }
+        QToolBar {
+            background: #EFEFEF;
+            border-bottom: 1px solid #E0E0E0;
+        }
+        QListWidget, QPlainTextEdit, QComboBox, QLineEdit {
+            background: #FFFFFF;
+            border: 1px solid #E0E0E0;
+            border-radius: 6px;
+            padding: 4px;
+        }
+        QPushButton {
+            background: #FFFFFF;
+            border: 1px solid #DADADA;
+            border-radius: 6px;
+            padding: 6px 10px;
+        }
+        QPushButton:hover {
+            border-color: #3A86FF;
+        }
+        QListWidget::item:selected {
+            background: #3A86FF;
+            color: #FFFFFF;
+        }
+        QComboBox::drop-down {
+            border: none;
+        }
+        """
+    )
 
     icon_path = Path(__file__).resolve().parents[1] / "assets" / "icon.svg"
     if icon_path.exists():

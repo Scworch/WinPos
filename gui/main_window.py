@@ -165,6 +165,13 @@ class MainWindow(QMainWindow):
         self.tray.activated.connect(self._on_tray_activated)
         self.tray.show()
 
+    def closeEvent(self, event) -> None:  # type: ignore[override]
+        if hasattr(self, "tray") and self.tray.isVisible():
+            event.ignore()
+            self.hide()
+            return
+        super().closeEvent(event)
+
     def _on_tray_activated(self, reason: QSystemTrayIcon.ActivationReason) -> None:
         if reason == QSystemTrayIcon.Trigger:
             self.toggle_visibility()
