@@ -26,6 +26,7 @@ from gui.components.applications_panel import ApplicationsPanel
 from gui.components.details_card import DetailsCard
 from gui.components.actions_panel import ActionsPanel
 from gui.components.preview_panel import PreviewPanel
+from monitors.monitor_manager import MonitorManager
 
 
 class MainWindow(QMainWindow):
@@ -406,6 +407,11 @@ class MainWindow(QMainWindow):
     def _build_monitor_role_options(self) -> List[Dict[str, str]]:
         roles = []
         role_map = self.data.get("monitor_roles") or {}
+        manager = MonitorManager(role_map)
+        try:
+            manager.refresh()
+        except Exception:
+            manager = None
         for role, cfg in role_map.items():
             match = (cfg or {}).get("match", {})
             parts = []
@@ -416,7 +422,14 @@ class MainWindow(QMainWindow):
             if "name_contains" in match:
                 parts.append(f"имя содержит '{match.get('name_contains')}'")
             suffix = f" ({', '.join(parts)})" if parts else ""
-            roles.append({"label": f"{role}{suffix}", "value": role})
+            label = f"{role}{suffix}"
+            if manager:
+                monitor = manager.get_by_role(role)
+                if monitor:
+                    label = f"{role} — {monitor.name} ({monitor.width}x{monitor.height})"
+                else:
+                    label = f"{role} — нет соответствия"
+            roles.append({"label": label, "value": role})
         return roles
 
 
