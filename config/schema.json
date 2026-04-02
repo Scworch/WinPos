@@ -24,7 +24,8 @@
             "properties": {
               "is_primary": {"type": "boolean"},
               "index": {"type": "integer", "minimum": 0},
-              "name_contains": {"type": "string"}
+              "name_contains": {"type": "string"},
+              "device_name": {"type": "string"}
             },
             "additionalProperties": false
           }

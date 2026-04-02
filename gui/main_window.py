@@ -417,9 +417,13 @@ class MainWindow(QMainWindow):
         for monitor in manager.get_all():
             role_name = f"monitor_{monitor.index + 1}"
             if role_name not in role_map:
-                role_map[role_name] = {"match": {"index": monitor.index}}
-            name = monitor.name or f"Монитор {monitor.index + 1}"
-            label = f"{name} ({monitor.width}x{monitor.height})"
+                role_map[role_name] = {"match": {"device_name": monitor.device_name}}
+            else:
+                role_map[role_name]["match"] = {"device_name": monitor.device_name}
+            display_name = monitor.name or f"Монитор {monitor.index + 1}"
+            if display_name.startswith("\\\\.\\"):
+                display_name = display_name.replace("\\\\.\\", "")
+            label = f"{display_name} ({monitor.width}x{monitor.height})"
             roles.append({"label": label, "value": role_name})
 
         return roles
