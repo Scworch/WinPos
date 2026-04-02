@@ -5,41 +5,40 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict, List
 
-from PySide6.QtCore import Qt, QSize
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction, QIcon
 from PySide6.QtWidgets import (
-    QComboBox,
-    QFormLayout,
+    QBoxLayout,
     QHBoxLayout,
-    QLabel,
-    QListWidget,
-    QListWidgetItem,
     QMainWindow,
     QMessageBox,
-    QPlainTextEdit,
-    QPushButton,
-    QInputDialog,
-    QSplitter,
-    QToolBar,
-    QVBoxLayout,
-    QWidget,
     QSystemTrayIcon,
     QMenu,
+    QVBoxLayout,
+    QWidget,
 )
 
 from gui.config_store import ConfigStore
 from gui.dialogs import AppDialog, ActionDialog, ProfileDialog
+from gui.components.toolbar import ToolbarWidget
+from gui.components.profiles_panel import ProfilesPanel
+from gui.components.applications_panel import ApplicationsPanel
+from gui.components.details_card import DetailsCard
+from gui.components.actions_panel import ActionsPanel
+from gui.components.preview_panel import PreviewPanel
 
 
 class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("WinPos")
-        self.resize(1100, 720)
+        self.resize(1280, 760)
 
         self.config_path = Path(__file__).resolve().parents[1] / "config" / "config.yaml"
         self.store = ConfigStore(self.config_path)
         self.data: Dict[str, Any] = self.store.load()
+        self._is_vertical = False
+        self._allow_close = False
 
         self._setup_ui()
         self._setup_tray()
@@ -47,105 +46,84 @@ class MainWindow(QMainWindow):
         self._refresh_apps()
 
     def _setup_ui(self) -> None:
-        toolbar = QToolBar("Main")
-        toolbar.setIconSize(QSize(18, 18))
-        self.addToolBar(toolbar)
+        central = QWidget()
+        root = QVBoxLayout()
+        root.setContentsMargins(0, 0, 0, 16)
+        root.setSpacing(12)
 
-        save_action = QAction("Сохранить", self)
-        save_action.triggered.connect(self.save_config)
-        toolbar.addAction(save_action)
+        self.toolbar = ToolbarWidget()
+        self.toolbar.save_button.clicked.connect(self.save_config)
+        self.toolbar.validate_button.clicked.connect(self.validate_config)
 
-        validate_action = QAction("Проверить", self)
-        validate_action.triggered.connect(self.validate_config)
-        toolbar.addAction(validate_action)
+        root.addWidget(self.toolbar)
 
-        splitter = QSplitter(Qt.Horizontal)
+        self.content = QWidget()
+        self.content_layout = QBoxLayout(QBoxLayout.LeftToRight)
+        self.content_layout.setSpacing(18)
+        self.content_layout.setContentsMargins(16, 12, 16, 0)
+        self.content.setLayout(self.content_layout)
 
-        left_panel = QWidget()
-        left_layout = QVBoxLayout()
-        left_panel.setLayout(left_layout)
+        self.left_panel = QWidget()
+        self.left_layout = QVBoxLayout()
+        self.left_layout.setSpacing(14)
+        self.left_layout.setContentsMargins(0, 0, 0, 0)
+        self.left_panel.setLayout(self.left_layout)
 
-        self.profile_combo = QComboBox()
-        self.profile_combo.currentTextChanged.connect(self._on_profile_changed)
-        left_layout.addWidget(QLabel("Профиль"))
-        left_layout.addWidget(self.profile_combo)
+        self.center_panel = QWidget()
+        self.center_layout = QVBoxLayout()
+        self.center_layout.setSpacing(14)
+        self.center_layout.setContentsMargins(0, 0, 0, 0)
+        self.center_panel.setLayout(self.center_layout)
 
-        profile_buttons = QHBoxLayout()
-        add_profile_btn = QPushButton("Добавить профиль")
-        add_profile_btn.clicked.connect(self.add_profile)
-        edit_profile_btn = QPushButton("Редактировать")
-        edit_profile_btn.clicked.connect(self.edit_profile)
-        profile_buttons.addWidget(add_profile_btn)
-        profile_buttons.addWidget(edit_profile_btn)
-        left_layout.addLayout(profile_buttons)
+        self.right_panel = QWidget()
+        self.right_layout = QVBoxLayout()
+        self.right_layout.setSpacing(14)
+        self.right_layout.setContentsMargins(0, 0, 0, 0)
+        self.right_panel.setLayout(self.right_layout)
 
-        left_layout.addWidget(QLabel("Приложения"))
-        self.app_list = QListWidget()
-        self.app_list.currentItemChanged.connect(self._on_app_selected)
-        left_layout.addWidget(self.app_list)
+        self.profiles_panel = ProfilesPanel()
+        self.profiles_panel.profile_combo.currentTextChanged.connect(self._on_profile_changed)
+        self.profiles_panel.add_profile_btn.clicked.connect(self.add_profile)
+        self.profiles_panel.edit_profile_btn.clicked.connect(self.edit_profile)
 
-        app_buttons = QHBoxLayout()
-        add_app_btn = QPushButton("Добавить")
-        add_app_btn.clicked.connect(self.add_app)
-        edit_app_btn = QPushButton("Изменить")
-        edit_app_btn.clicked.connect(self.edit_app)
-        remove_app_btn = QPushButton("Удалить")
-        remove_app_btn.clicked.connect(self.remove_app)
-        app_buttons.addWidget(add_app_btn)
-        app_buttons.addWidget(edit_app_btn)
-        app_buttons.addWidget(remove_app_btn)
-        left_layout.addLayout(app_buttons)
+        self.apps_panel = ApplicationsPanel()
+        self.apps_panel.app_list.currentItemChanged.connect(self._on_app_selected)
+        self.apps_panel.add_app_btn.clicked.connect(self.add_app)
+        self.apps_panel.edit_app_btn.clicked.connect(self.edit_app)
+        self.apps_panel.remove_app_btn.clicked.connect(self.remove_app)
 
-        right_panel = QWidget()
-        right_layout = QVBoxLayout()
-        right_panel.setLayout(right_layout)
+        self.details_card = DetailsCard()
+        self.actions_panel = ActionsPanel()
+        self.actions_panel.add_action_btn.clicked.connect(self.add_action)
+        self.actions_panel.edit_action_btn.clicked.connect(self.edit_action)
+        self.actions_panel.remove_action_btn.clicked.connect(self.remove_action)
+        self.actions_panel.up_btn.clicked.connect(lambda: self.move_action(-1))
+        self.actions_panel.down_btn.clicked.connect(lambda: self.move_action(1))
 
-        self.detail_form = QFormLayout()
-        self.detail_display_name = QLabel("—")
-        self.detail_cmd = QLabel("—")
-        self.detail_match = QLabel("—")
-        self.detail_form.addRow("Название", self.detail_display_name)
-        self.detail_form.addRow("Команда", self.detail_cmd)
-        self.detail_form.addRow("Окно", self.detail_match)
-        right_layout.addLayout(self.detail_form)
+        self.preview_panel = PreviewPanel()
 
-        right_layout.addWidget(QLabel("Действия"))
-        self.action_list = QListWidget()
-        right_layout.addWidget(self.action_list)
+        self.left_layout.addWidget(self.profiles_panel)
+        self.left_layout.addWidget(self.apps_panel)
+        self.left_layout.addStretch(1)
 
-        action_buttons = QHBoxLayout()
-        add_action_btn = QPushButton("Добавить действие")
-        add_action_btn.clicked.connect(self.add_action)
-        edit_action_btn = QPushButton("Изменить")
-        edit_action_btn.clicked.connect(self.edit_action)
-        remove_action_btn = QPushButton("Удалить")
-        remove_action_btn.clicked.connect(self.remove_action)
-        move_up_btn = QPushButton("Вверх")
-        move_up_btn.clicked.connect(lambda: self.move_action(-1))
-        move_down_btn = QPushButton("Вниз")
-        move_down_btn.clicked.connect(lambda: self.move_action(1))
-        action_buttons.addWidget(add_action_btn)
-        action_buttons.addWidget(edit_action_btn)
-        action_buttons.addWidget(remove_action_btn)
-        action_buttons.addWidget(move_up_btn)
-        action_buttons.addWidget(move_down_btn)
-        right_layout.addLayout(action_buttons)
+        self.center_layout.addWidget(self.details_card)
+        self.center_layout.addWidget(self.actions_panel)
+        self.center_layout.addStretch(1)
 
-        right_layout.addWidget(QLabel("Preview"))
-        self.preview_box = QPlainTextEdit()
-        self.preview_box.setReadOnly(True)
-        right_layout.addWidget(self.preview_box)
+        self.right_layout.addWidget(self.preview_panel)
 
-        splitter.addWidget(left_panel)
-        splitter.addWidget(right_panel)
-        splitter.setStretchFactor(0, 1)
-        splitter.setStretchFactor(1, 2)
+        self.content_layout.addWidget(self.left_panel)
+        self.content_layout.addWidget(self.center_panel)
+        self.content_layout.addWidget(self.right_panel)
+        self.content_layout.setStretch(0, 1)
+        self.content_layout.setStretch(1, 2)
+        self.content_layout.setStretch(2, 1)
 
-        container = QWidget()
-        layout = QHBoxLayout()
-        layout.addWidget(splitter)
-        container.setLayout(layout)
-        self.setCentralWidget(container)
+        root.addWidget(self.content)
+        central.setLayout(root)
+        self.setCentralWidget(central)
+
+        self._apply_responsive_layout(self.width())
 
     def _setup_tray(self) -> None:
         icon_path = Path(__file__).resolve().parents[1] / "assets" / "icon.svg"
@@ -157,7 +135,7 @@ class MainWindow(QMainWindow):
         show_action = QAction("Открыть/скрыть", self)
         show_action.triggered.connect(self.toggle_visibility)
         exit_action = QAction("Выход", self)
-        exit_action.triggered.connect(self.close)
+        exit_action.triggered.connect(self._quit_app)
         menu.addAction(show_action)
         menu.addAction(exit_action)
 
@@ -165,12 +143,22 @@ class MainWindow(QMainWindow):
         self.tray.activated.connect(self._on_tray_activated)
         self.tray.show()
 
-    def closeEvent(self, event) -> None:  # type: ignore[override]
-        if hasattr(self, "tray") and self.tray.isVisible():
-            event.ignore()
-            self.hide()
+    def resizeEvent(self, event) -> None:  # type: ignore[override]
+        self._apply_responsive_layout(event.size().width())
+        super().resizeEvent(event)
+
+    def _apply_responsive_layout(self, width: int) -> None:
+        vertical = width < 1100
+        if vertical == self._is_vertical:
             return
-        super().closeEvent(event)
+        self._is_vertical = vertical
+        self.content_layout.setDirection(
+            QBoxLayout.TopToBottom if vertical else QBoxLayout.LeftToRight
+        )
+        if vertical:
+            self.left_panel.setMaximumWidth(16777215)
+        else:
+            self.left_panel.setMaximumWidth(380)
 
     def _on_tray_activated(self, reason: QSystemTrayIcon.ActivationReason) -> None:
         if reason == QSystemTrayIcon.Trigger:
@@ -184,25 +172,40 @@ class MainWindow(QMainWindow):
             self.raise_()
             self.activateWindow()
 
+    def closeEvent(self, event) -> None:  # type: ignore[override]
+        if self._allow_close:
+            super().closeEvent(event)
+            return
+        if hasattr(self, "tray") and self.tray.isVisible():
+            event.ignore()
+            self.hide()
+            return
+        super().closeEvent(event)
+
+    def _quit_app(self) -> None:
+        self._allow_close = True
+        if hasattr(self, "tray"):
+            self.tray.hide()
+        self.close()
+
     def _refresh_profiles(self) -> None:
         profiles = list((self.data.get("profiles") or {}).keys())
         if not profiles:
             profiles = ["default"]
             self.data.setdefault("profiles", {})["default"] = {"apps": []}
-        self.profile_combo.clear()
-        self.profile_combo.addItems(profiles)
+        self.profiles_panel.profile_combo.clear()
+        self.profiles_panel.profile_combo.addItems(profiles)
         default_profile = self.data.get("settings", {}).get("default_profile", profiles[0])
         if default_profile in profiles:
-            self.profile_combo.setCurrentText(default_profile)
+            self.profiles_panel.profile_combo.setCurrentText(default_profile)
 
     def _refresh_apps(self) -> None:
-        self.app_list.clear()
+        self.apps_panel.app_list.clear()
         apps = self.data.get("apps", {})
         for app_id in sorted(apps.keys()):
-            item = QListWidgetItem(app_id)
-            self.app_list.addItem(item)
-        if self.app_list.count() > 0:
-            self.app_list.setCurrentRow(0)
+            self.apps_panel.app_list.addItem(app_id)
+        if self.apps_panel.app_list.count() > 0:
+            self.apps_panel.app_list.setCurrentRow(0)
 
     def _on_profile_changed(self, profile_id: str) -> None:
         settings = self.data.setdefault("settings", {})
@@ -210,24 +213,24 @@ class MainWindow(QMainWindow):
         self._refresh_apps()
 
     def _on_app_selected(self) -> None:
-        item = self.app_list.currentItem()
+        item = self.apps_panel.app_list.currentItem()
         if not item:
             return
         app_id = item.text()
         app = (self.data.get("apps") or {}).get(app_id, {})
-        self.detail_display_name.setText(app.get("display_name", ""))
-        self.detail_cmd.setText((app.get("launch") or {}).get("cmd", ""))
+        self.details_card.display_name.setText(app.get("display_name", ""))
+        self.details_card.cmd.setText((app.get("launch") or {}).get("cmd", ""))
         match = app.get("window_match", {})
         match_text = ", ".join(f"{k}={v}" for k, v in match.items()) if match else "—"
-        self.detail_match.setText(match_text)
+        self.details_card.match.setText(match_text)
         self._refresh_actions(app)
         self._update_preview(app)
 
     def _refresh_actions(self, app: Dict[str, Any]) -> None:
-        self.action_list.clear()
+        self.actions_panel.action_list.clear()
         for action in app.get("actions", []) or []:
             label = self._format_action(action)
-            self.action_list.addItem(label)
+            self.actions_panel.action_list.addItem(label)
 
     def _format_action(self, action: Dict[str, Any]) -> str:
         params = action.get("params") or {}
@@ -248,7 +251,7 @@ class MainWindow(QMainWindow):
                     lines.append(f"  - {self._format_action(chain_action)}")
             else:
                 lines.append(f"- {self._format_action(action)}")
-        self.preview_box.setPlainText("\n".join(lines) if lines else "Нет действий")
+        self.preview_panel.preview_box.setPlainText("\n".join(lines) if lines else "Нет действий")
 
     def add_app(self) -> None:
         dialog = AppDialog()
@@ -260,7 +263,7 @@ class MainWindow(QMainWindow):
         self._refresh_apps()
 
     def edit_app(self) -> None:
-        item = self.app_list.currentItem()
+        item = self.apps_panel.app_list.currentItem()
         if not item:
             return
         app_id = item.text()
@@ -273,7 +276,7 @@ class MainWindow(QMainWindow):
         self._refresh_apps()
 
     def remove_app(self) -> None:
-        item = self.app_list.currentItem()
+        item = self.apps_panel.app_list.currentItem()
         if not item:
             return
         app_id = item.text()
@@ -286,7 +289,7 @@ class MainWindow(QMainWindow):
         self._refresh_apps()
 
     def _current_app(self) -> Dict[str, Any]:
-        item = self.app_list.currentItem()
+        item = self.apps_panel.app_list.currentItem()
         if not item:
             return {}
         app_id = item.text()
@@ -308,7 +311,7 @@ class MainWindow(QMainWindow):
         app = self._current_app()
         if not app:
             return
-        row = self.action_list.currentRow()
+        row = self.actions_panel.action_list.currentRow()
         if row < 0:
             return
         actions = app.get("actions", [])
@@ -324,7 +327,7 @@ class MainWindow(QMainWindow):
         app = self._current_app()
         if not app:
             return
-        row = self.action_list.currentRow()
+        row = self.actions_panel.action_list.currentRow()
         if row < 0:
             return
         actions = app.get("actions", [])
@@ -336,7 +339,7 @@ class MainWindow(QMainWindow):
         app = self._current_app()
         if not app:
             return
-        row = self.action_list.currentRow()
+        row = self.actions_panel.action_list.currentRow()
         if row < 0:
             return
         actions = app.get("actions", [])
@@ -345,7 +348,7 @@ class MainWindow(QMainWindow):
             return
         actions[row], actions[new_index] = actions[new_index], actions[row]
         self._refresh_actions(app)
-        self.action_list.setCurrentRow(new_index)
+        self.actions_panel.action_list.setCurrentRow(new_index)
         self._update_preview(app)
 
     def add_profile(self) -> None:
@@ -357,7 +360,7 @@ class MainWindow(QMainWindow):
         self._refresh_profiles()
 
     def edit_profile(self) -> None:
-        profile_id = self.profile_combo.currentText()
+        profile_id = self.profiles_panel.profile_combo.currentText()
         if not profile_id:
             return
         profiles = self.data.setdefault("profiles", {})
@@ -387,5 +390,7 @@ class MainWindow(QMainWindow):
 
 
 def _prompt_text(parent: QWidget, title: str, label: str) -> tuple[str, bool]:
+    from PySide6.QtWidgets import QInputDialog
+
     text, ok = QInputDialog.getText(parent, title, label)
     return text.strip(), bool(ok)

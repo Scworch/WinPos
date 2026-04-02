@@ -48,6 +48,7 @@ class AppDialog(QDialog):
         super().__init__()
         self.setWindowTitle("Приложение")
         self._data = data or {}
+        self._window_cache: List[Any] = []
 
         self.app_id_edit = QLineEdit(app_id or "")
         self.display_name_edit = QLineEdit(self._data.get("display_name", ""))
@@ -61,6 +62,12 @@ class AppDialog(QDialog):
         self.class_name_edit = QLineEdit(match.get("class_name", ""))
         self.process_name_edit = QLineEdit(match.get("process_name", ""))
 
+        self.window_combo = QComboBox()
+        self.refresh_windows_btn = QPushButton("Обновить окна")
+        self.apply_window_btn = QPushButton("Заполнить из окна")
+        self.refresh_windows_btn.clicked.connect(self._refresh_windows)
+        self.apply_window_btn.clicked.connect(self._apply_window_selection)
+
         form = QFormLayout()
         form.addRow("ID", self.app_id_edit)
         form.addRow("Название", self.display_name_edit)
@@ -71,6 +78,12 @@ class AppDialog(QDialog):
         form.addRow("Заголовок равен", self.title_equals_edit)
         form.addRow("Класс окна", self.class_name_edit)
         form.addRow("Имя процесса", self.process_name_edit)
+
+        window_row = QHBoxLayout()
+        window_row.addWidget(self.window_combo)
+        window_row.addWidget(self.refresh_windows_btn)
+        window_row.addWidget(self.apply_window_btn)
+        form.addRow("Запущенные окна", window_row)
 
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         buttons.accepted.connect(self.accept)
@@ -83,6 +96,33 @@ class AppDialog(QDialog):
 
         if app_id:
             self.app_id_edit.setDisabled(True)
+        self._refresh_windows()
+
+    def _refresh_windows(self) -> None:
+        self.window_combo.clear()
+        self._window_cache = []
+        try:
+            from windows.window_manager import WindowManager
+        except Exception:
+            self.window_combo.addItem("Не удалось получить окна")
+            return
+        manager = WindowManager()
+        windows = manager.list_windows()
+        for win in windows:
+            label = f"{win.title} [{win.class_name}]"
+            self.window_combo.addItem(label, win)
+            self._window_cache.append(win)
+
+    def _apply_window_selection(self) -> None:
+        data = self.window_combo.currentData()
+        if not data:
+            return
+        title = getattr(data, "title", "")
+        class_name = getattr(data, "class_name", "")
+        if title:
+            self.title_contains_edit.setText(title)
+        if class_name:
+            self.class_name_edit.setText(class_name)
 
     def get_data(self) -> Optional[Dict[str, Any]]:
         if self.exec() != QDialog.Accepted:
