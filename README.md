@@ -1,34 +1,46 @@
 ﻿# WinPos
 
-WinPos — модульный фреймворк автоматизации для Windows 11. Система запускает, размещает и управляет любыми приложениями на нескольких мониторах через конфигурацию, а не через захардкоженные сценарии. Архитектура готова к будущему GUI-редактору.
+WinPos — приложение для автоматизации Windows 11: запуск, размещение и управление окнами приложений на нескольких мониторах через настраиваемые профили. Есть GUI‑редактор конфигурации.
 
 ## Возможности
-- Реестр приложений и профилей.
-- Переиспользуемые action-цепочки.
-- WinAPI-управление окнами (pywin32).
-- Динамическое определение мониторов и ролей.
-- Последовательная очередь UI-действий как fallback.
-- Безопасные повторы, тайм-ауты, базовая устойчивость.
-- Готово к упаковке в `.exe` через PyInstaller.
+- Запуск приложений и проверка, что они уже запущены
+- Управление окнами через WinAPI (перемещение, центрирование, размер, maximize/minimize)
+- Действия по цепочкам, условия, повторы, fallback
+- Выбор физического монитора в GUI
+- Логи в файл и консоль
+- Упаковка в `.exe` через PyInstaller
 
-## Быстрый старт
+## Требования
+- Windows 11
+- Python 3.11
+
+## Установка
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
+```
+
+## Запуск
+### Автоматизация (CLI)
+```powershell
 python orchestrator\main.py
 ```
 
-## GUI конфигуратор
+### GUI‑редактор
 ```powershell
 python gui\main.py
 ```
 
 ## Конфигурация
-- Основной файл: `config/config.yaml`
-- Схема: `config/schema.json`
+Файлы:
+- `config/config.yaml` — личная конфигурация (не хранится в репозитории)
+- `config/config.example.yaml` — пример
+- `config/schema.json`
 
-Пример приложения:
+При первом запуске `config/config.yaml` создаётся автоматически на основе `DEFAULT_CONFIG`.
+
+### Пример приложения
 ```yaml
 apps:
   notepad:
@@ -44,32 +56,69 @@ apps:
           name: basic_window_setup
 ```
 
-## Экшены
-Поддерживаются универсальные типы:
-- `launch_app`, `wait_for_process`, `wait_for_window`
-- `bring_to_foreground`, `move_window_to_monitor`, `center_window`
-- `resize_window`, `maximize`, `minimize`
-- `send_hotkeys`, `send_text`, `open_url`
-- `wait_for_title_change`, `wait_for_visibility`
-- `use_chain` для переиспользуемых последовательностей
+### Пример цепочки действий
+```yaml
+action_chains:
+  basic_window_setup:
+    - type: wait_for_window
+      params:
+        timeout_s: 10
+    - type: bring_to_foreground
+    - type: move_window_to_monitor
+      params:
+        monitor_role: primary
+    - type: maximize
+```
 
-## Сборка в .exe (PyInstaller)
+### Профили
+```yaml
+profiles:
+  default:
+    apps:
+      - notepad
+```
+
+## Действия (основные)
+- `launch_app`
+- `wait_for_process`
+- `wait_for_window`
+- `bring_to_foreground`
+- `move_window_to_monitor`
+- `center_window`
+- `resize_window`
+- `maximize`, `minimize`
+- `send_hotkeys`, `send_text`
+- `open_url`
+- `wait_for_title_change`, `wait_for_visibility`
+- `use_chain`
+
+## Логи
+`logs/winpos.log`
+
+## Сборка в .exe
 ```powershell
 pyinstaller --onefile --name WinPos orchestrator\main.py
 ```
 
-## Структура проекта
+GUI можно собрать отдельно:
+```powershell
+pyinstaller --onefile --name WinPos-GUI gui\main.py
 ```
-actions/           # engine + примитивы действий
-config/            # config.yaml + schema.json + менеджер
+
+## Структура
+```
+actions/           # действия и engine
+config/            # конфигурация
 launcher/          # запуск процессов
-monitors/          # обнаружение мониторов и роли
-orchestrator/      # entrypoint и scheduler
-registry/          # реестр приложений/профилей
-recovery/          # watchdog (плейсхолдер)
-state/             # состояние исполнения
-ui/                # последовательная очередь UI действий
-windows/           # WinAPI управление окнами
-utils/             # ожидания/ретраи
 logging_system/    # логирование
+monitors/          # мониторы
+orchestrator/      # выполнение профилей
+registry/          # приложения/профили
+state/             # состояние
+ui/                # очередь UI‑действий
+windows/           # WinAPI управление окнами
+gui/               # GUI‑редактор
 ```
+
+## Лицензия
+См. `LICENSE`.

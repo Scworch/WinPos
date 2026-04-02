@@ -22,3 +22,8 @@ state/locks/
 # OS
 .DS_Store
 Thumbs.db
+
+# Local config
+config/config.yaml
+
+config\config.yaml

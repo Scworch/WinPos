@@ -43,6 +43,10 @@ class ConfigManager:
             with self.path.open("r", encoding="utf-8") as handle:
                 loaded = yaml.safe_load(handle) or {}
             data = _deep_merge(data, loaded)
+        else:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            with self.path.open("w", encoding="utf-8") as handle:
+                yaml.safe_dump(DEFAULT_CONFIG, handle, sort_keys=False, allow_unicode=True)
 
         self.raw = data
         issues = validate_config(data)

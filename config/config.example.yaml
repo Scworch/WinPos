@@ -37,10 +37,6 @@ apps:
       - type: use_chain
         params:
           name: basic_window_setup
-      - type: send_text
-        params:
-          text: "WinPos стартовал."
-          enter_after: true
 
 profiles:
   default:
