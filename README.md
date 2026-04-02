@@ -19,6 +19,11 @@ pip install -r requirements.txt
 python orchestrator\main.py
 ```
 
+## GUI конфигуратор
+```powershell
+python gui\main.py
+```
+
 ## Конфигурация
 - Основной файл: `config/config.yaml`
 - Схема: `config/schema.json`
