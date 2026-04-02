@@ -174,6 +174,7 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event) -> None:  # type: ignore[override]
         if self._allow_close:
+            event.accept()
             super().closeEvent(event)
             return
         if hasattr(self, "tray") and self.tray.isVisible():
@@ -186,7 +187,12 @@ class MainWindow(QMainWindow):
         self._allow_close = True
         if hasattr(self, "tray"):
             self.tray.hide()
+        from PySide6.QtWidgets import QApplication
+
         self.close()
+        app = QApplication.instance()
+        if app:
+            app.quit()
 
     def _refresh_profiles(self) -> None:
         profiles = list((self.data.get("profiles") or {}).keys())
