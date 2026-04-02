@@ -100,6 +100,11 @@ def main() -> int:
             font-size: 14px;
             font-weight: 600;
         }
+        QLabel#SectionTitle {
+            font-size: 13px;
+            font-weight: 600;
+            color: #4A4458;
+        }
         """
     )
 

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
+from pathlib import Path
+
 import yaml
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QDoubleValidator, QIntValidator
@@ -12,6 +14,7 @@ from PySide6.QtWidgets import (
     QComboBox,
     QDialog,
     QDialogButtonBox,
+    QFileDialog,
     QFormLayout,
     QHBoxLayout,
     QLabel,
@@ -225,6 +228,34 @@ class AppDialog(QDialog):
         self.class_name_edit = QLineEdit(match.get("class_name", ""))
         self.process_name_edit = QLineEdit(match.get("process_name", ""))
 
+        self.app_id_edit.setPlaceholderText("например: notepad")
+        self.app_id_edit.setToolTip("Уникальный ID. Без пробелов.")
+        self.display_name_edit.setPlaceholderText("Например: Блокнот")
+        self.display_name_edit.setToolTip("Название будет видно в списках.")
+
+        self.cmd_edit.setPlaceholderText("C:\\Program Files\\App\\app.exe или notepad.exe")
+        self.cmd_edit.setToolTip("Команда запуска. Можно указать exe или системную команду.")
+        self.args_edit.setPlaceholderText("--profile default, /safe")
+        self.args_edit.setToolTip("Аргументы запуска. Через запятую.")
+        self.cwd_edit.setPlaceholderText("C:\\Program Files\\App")
+        self.cwd_edit.setToolTip("Рабочая папка. Оставьте пустым, если не нужно.")
+
+        self.title_contains_edit.setPlaceholderText("например: Notepad")
+        self.title_contains_edit.setToolTip("Фрагмент заголовка окна.")
+        self.title_equals_edit.setPlaceholderText("Полный заголовок")
+        self.title_equals_edit.setToolTip("Точное совпадение заголовка.")
+        self.class_name_edit.setPlaceholderText("например: Notepad")
+        self.class_name_edit.setToolTip("Имя класса окна (WinAPI).")
+        self.process_name_edit.setPlaceholderText("notepad.exe")
+        self.process_name_edit.setToolTip("Имя процесса, если нужно точнее.")
+
+        self.pick_cmd_btn = QPushButton("Выбрать exe")
+        self.pick_cmd_btn.setToolTip("Выбрать исполняемый файл.")
+        self.pick_cmd_btn.clicked.connect(self._pick_exe)
+        self.pick_cwd_btn = QPushButton("Папка")
+        self.pick_cwd_btn.setToolTip("Выбрать рабочую папку.")
+        self.pick_cwd_btn.clicked.connect(self._pick_cwd)
+
         self.window_combo = QComboBox()
         self.refresh_windows_btn = QPushButton("Обновить окна")
         self.apply_window_btn = QPushButton("Заполнить из окна")
@@ -235,35 +266,78 @@ class AppDialog(QDialog):
         self.apply_window_btn.setToolTip("Заполнит поля window_match по выбранному окну.")
         self.refresh_windows_btn.setToolTip("Обновить список видимых окон.")
 
-        form = QFormLayout()
-        form.addRow("ID", self.app_id_edit)
-        form.addRow("Название", self.display_name_edit)
-        form.addRow("Команда", self.cmd_edit)
-        form.addRow("Аргументы (через ,)", self.args_edit)
-        form.addRow("Рабочая папка", self.cwd_edit)
-        form.addRow("Заголовок содержит", self.title_contains_edit)
-        form.addRow("Заголовок равен", self.title_equals_edit)
-        form.addRow("Класс окна", self.class_name_edit)
-        form.addRow("Имя процесса", self.process_name_edit)
+        basic_form = QFormLayout()
+        basic_form.addRow("ID", self.app_id_edit)
+        basic_form.addRow("Название", self.display_name_edit)
+
+        cmd_row = QHBoxLayout()
+        cmd_row.addWidget(self.cmd_edit)
+        cmd_row.addWidget(self.pick_cmd_btn)
+        cmd_container = QWidget()
+        cmd_container.setLayout(cmd_row)
+        launch_form = QFormLayout()
+        launch_form.addRow("Команда", cmd_container)
+        launch_form.addRow("Аргументы (через ,)", self.args_edit)
+
+        cwd_row = QHBoxLayout()
+        cwd_row.addWidget(self.cwd_edit)
+        cwd_row.addWidget(self.pick_cwd_btn)
+        cwd_container = QWidget()
+        cwd_container.setLayout(cwd_row)
+        launch_form.addRow("Рабочая папка", cwd_container)
+
+        window_form = QFormLayout()
+        window_form.addRow("Заголовок содержит", self.title_contains_edit)
+        window_form.addRow("Заголовок равен", self.title_equals_edit)
+        window_form.addRow("Класс окна", self.class_name_edit)
+        window_form.addRow("Имя процесса", self.process_name_edit)
 
         window_row = QHBoxLayout()
         window_row.addWidget(self.window_combo)
         window_row.addWidget(self.refresh_windows_btn)
         window_row.addWidget(self.apply_window_btn)
-        form.addRow("Запущенные окна", window_row)
+        window_container = QWidget()
+        window_container.setLayout(window_row)
+        window_form.addRow("Запущенные окна", window_container)
 
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
 
         layout = QVBoxLayout()
-        layout.addLayout(form)
+        basic_label = QLabel("Основное")
+        basic_label.setObjectName("SectionTitle")
+        launch_label = QLabel("Запуск")
+        launch_label.setObjectName("SectionTitle")
+        window_label = QLabel("Поиск окна")
+        window_label.setObjectName("SectionTitle")
+
+        layout.addWidget(basic_label)
+        layout.addLayout(basic_form)
+        layout.addSpacing(8)
+        layout.addWidget(launch_label)
+        layout.addLayout(launch_form)
+        layout.addSpacing(8)
+        layout.addWidget(window_label)
+        layout.addLayout(window_form)
         layout.addWidget(buttons)
         self.setLayout(layout)
 
         if app_id:
             self.app_id_edit.setDisabled(True)
         self._refresh_windows()
+
+    def _pick_exe(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(self, "Выберите exe", "", "Executable (*.exe);;All Files (*)")
+        if path:
+            self.cmd_edit.setText(path)
+            if not self.display_name_edit.text().strip():
+                self.display_name_edit.setText(Path(path).stem)
+
+    def _pick_cwd(self) -> None:
+        path = QFileDialog.getExistingDirectory(self, "Выберите папку")
+        if path:
+            self.cwd_edit.setText(path)
 
     def _refresh_windows(self) -> None:
         self.window_combo.clear()
